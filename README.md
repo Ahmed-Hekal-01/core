@@ -4,17 +4,10 @@ The `core` module is a shared Android library providing a foundational Clean Arc
 
 ## 📦 Installation & Setup
 
-Since this library is published locally, follow these steps to use it in another project on your machine.
+This library is hosted on GitHub and distributed via **JitPack**.
 
-### 1. Publish to Maven Local
-Before using the library in another project, you must build and publish it to your local Maven repository. Navigate to this `core` project in your terminal and run:
-```bash
-./gradlew publishToMavenLocal
-```
-This will publish the library to `~/.m2/repository/com/link/core/1.1.0/`.
-
-### 2. Add Dependency in Consumer App
-In the target application where you want to use the library, ensure `mavenLocal()` is included in your `settings.gradle.kts` or project-level `build.gradle.kts`:
+### 1. Add JitPack to your project
+In the target application where you want to use the library, ensure JitPack is included in your `settings.gradle.kts` (or project-level `build.gradle.kts`):
 
 ```kotlin
 dependencyResolutionManagement {
@@ -22,15 +15,17 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        mavenLocal() // <-- Add this
+        maven { url = uri("https://jitpack.io") } // <-- Add this
     }
 }
 ```
 
-Then, add the dependency to your app-level `build.gradle.kts`:
+### 2. Add Dependency
+Add the dependency to your app-level `build.gradle.kts`. You can use a specific version (like `1.1.1`) or always pull the newest code by using `latest`.
+
 ```kotlin
 dependencies {
-    implementation("com.link:core:1.1.0")
+    implementation("com.github.Ahmed-Hekal-01:core:1.1.1") // Or :latest
 }
 ```
 
