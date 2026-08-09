@@ -35,10 +35,15 @@ publishing {
         register<MavenPublication>("release") {
             groupId = "com.link"
             artifactId = "core"
-            version = "1.1.0" // Bumped version
+            version = "1.1.1" // Bumped to 1.1.1 to force JitPack to generate a new POM
 
             afterEvaluate {
                 from(components["release"])
+            }
+            
+            // Force Gradle to declare this as an Android library in the POM file!
+            pom {
+                packaging = "aar"
             }
         }
     }
