@@ -1,139 +1,179 @@
-# Link Core Library
+# core
 
-The `core` module is a shared Android library providing a foundational Clean Architecture setup, networking tools, MVI architecture base classes, and standard utility components for Android applications.
+[![](https://jitpack.io/v/Ahmed-Hekal-01/core.svg)](https://jitpack.io/#Ahmed-Hekal-01/core)
 
-## 📦 Installation & Setup
+A reusable Android library that provides a full-stack foundation for modern Android applications. It ships batteries-included support for **MVI architecture**, **Retrofit networking**, **Firebase Auth & Firestore**, **DataStore preferences**, **theme/locale control**, and **session management** — all pre-wired with Hilt DI so you can start building features immediately.
 
-This library is hosted on GitHub and distributed via **JitPack**.
+---
 
-### 1. Add JitPack to your project
-In the target application where you want to use the library, ensure JitPack is included in your `settings.gradle.kts` (or project-level `build.gradle.kts`):
+## Requirements
+
+| Tool | Version |
+|---|---|
+| Kotlin | 2.3.10 |
+| Android Gradle Plugin | 9.1.1 |
+| Min SDK | 24 |
+| Compile SDK | 36 |
+| Java | 17 |
+
+---
+
+## Installation
+
+### 1. Add JitPack to your dependency resolution
+
+In your root `settings.gradle.kts`:
 
 ```kotlin
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
         mavenCentral()
-        maven { url = uri("https://jitpack.io") } // <-- Add this
+        maven { url = uri("https://jitpack.io") }
     }
 }
 ```
 
-### 2. Add Dependency
-Add the dependency to your app-level `build.gradle.kts`. You can use a specific version (like `1.1.1`) or always pull the newest code by using `latest`.
+### 2. Add the dependency
+
+In your module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.Ahmed-Hekal-01:core:1.1.1") // Or :latest
+    implementation("com.github.Ahmed-Hekal-01:core:1.1.1")
 }
 ```
 
-## 🚀 Core Features & Usage
+### 3. Apply the required plugins
 
-### 1. UI Controllers (`ThemeController`, `LocaleController`, `SessionController`)
-The library provides dedicated, public controllers that expose clean `StateFlow`s for Jetpack Compose, hiding the underlying DataStore implementation.
+```kotlin
+plugins {
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.ksp)
+}
+```
 
-**Example Usage:**
+### 4. Enable Hilt in your Application class
+
+```kotlin
+@HiltAndroidApp
+class MyApp : Application()
+```
+
+That's it — all Hilt modules provided by this library are automatically discovered.
+
+---
+
+## What's Included
+
+| Module | What it gives you |
+|---|---|
+| **MVI** | `BaseViewModel<STATE, EVENT, ONE_TIME_ACTION>` — a full MVI base class |
+| **Networking** | Pre-configured `OkHttpClient` + `Retrofit.Builder` + `SafeApiCall` |
+| **Firebase Auth** | `AuthService` — login, register, logout, current user |
+| **Firestore** | `FirestoreService` — add, getAll, delete, observe (real-time) |
+| **DataStore** | `ThemeController`, `LocaleController` — persisted theme & language |
+| **Session** | `SessionController` — first-launch flag and guest-mode state |
+| **Error handling** | `NetworkError` + `Resource` sealed types + `StringWrapper` extensions |
+| **Coroutines** | `DispatcherProvider` — testable dispatcher injection |
+
+---
+
+## Quick Examples
+
+### MVI ViewModel
+
+```kotlin
+// 1. Define your contracts
+data class HomeState(val isLoading: Boolean = false, val items: List<Item> = emptyList()) : State
+sealed interface HomeEvent : Event { data object LoadItems : HomeEvent }
+sealed interface HomeAction : OneTimeAction { data object NavigateToDetail : HomeAction }
+
+// 2. Extend BaseViewModel
+@HiltViewModel
+class HomeViewModel @Inject constructor(
+    private val safeApiCall: SafeApiCall
+) : BaseViewModel<HomeState, HomeEvent, HomeAction>() {
+
+    override fun createInitialState() = HomeState()
+
+    override fun onEvent(event: HomeEvent) = when (event) {
+        HomeEvent.LoadItems -> loadItems()
+    }
+
+    private fun loadItems() {
+        viewModelScope.launch {
+            setState { copy(isLoading = true) }
+            val result = safeApiCall { myApi.getItems() }
+            when (result) {
+                is Resource.Success -> setState { copy(isLoading = false, items = result.data) }
+                is Resource.Error   -> setState { copy(isLoading = false) }
+            }
+        }
+    }
+}
+```
+
+### Retrofit API Service
+
 ```kotlin
 @HiltViewModel
-class SettingsViewModel @Inject constructor(
-    private val themeController: ThemeController,
-    private val localeController: LocaleController,
-    private val sessionController: SessionController
+class MyViewModel @Inject constructor(
+    private val retrofitFactory: RetrofitFactory,
+    private val safeApiCall: SafeApiCall
 ) : ViewModel() {
 
-    val currentTheme = themeController.currentTheme // StateFlow<AppTheme>
-    val isGuest = sessionController.isGuest // StateFlow<Boolean>
-
-    fun toggleTheme() {
-        viewModelScope.launch { themeController.setTheme(AppTheme.DARK) }
-    }
+    private val api = retrofitFactory.createService(
+        serviceClass = MyApi::class.java,
+        baseUrl = "https://api.example.com/",
+        interceptors = listOf(AuthInterceptor())
+    )
 }
 ```
 
-### 2. MVI Architecture (`BaseViewModel`)
-The library provides a powerful `BaseViewModel` that strictly enforces the Model-View-Intent pattern using Kotlin Coroutines and Flows.
+### Firebase Auth
 
-**Example Usage:**
 ```kotlin
-// 1. Define your State, Events, and Actions
-data class ProfileState(val isLoading: Boolean = false, val name: String = "") : State
-sealed class ProfileEvent : Event {
-    object LoadProfile : ProfileEvent()
-}
-sealed class ProfileAction : OneTimeAction {
-    data class ShowToast(val message: String) : ProfileAction()
-}
-
-// 2. Extend the BaseViewModel
 @HiltViewModel
-class ProfileViewModel @Inject constructor() : BaseViewModel<ProfileState, ProfileEvent, ProfileAction>() {
-    
-    override fun createInitialState() = ProfileState()
-
-    override fun onEvent(event: ProfileEvent) {
-        when (event) {
-            is ProfileEvent.LoadProfile -> loadData()
+class AuthViewModel @Inject constructor(
+    private val authService: AuthService
+) : ViewModel() {
+    fun login(email: String, password: String) {
+        viewModelScope.launch {
+            when (val result = authService.login(email, password)) {
+                is Resource.Success -> { /* navigate */ }
+                is Resource.Error   -> { /* show error */ }
+            }
         }
     }
-
-    private fun loadData() {
-        // Update State
-        setState { copy(isLoading = true) }
-        
-        // Send a one-time UI action (e.g. navigation or toast)
-        sendOneTimeAction(ProfileAction.ShowToast("Loading Profile!"))
-    }
 }
 ```
 
-### 3. Networking & `RetrofitFactory`
-The library provides an abstracted way to create Retrofit services without leaking OkHttp interceptors.
-
-**Example Usage:**
-```kotlin
-@Module
-@InstallIn(SingletonComponent::class)
-object MyApiModule {
-
-    @Provides
-    @Singleton
-    fun provideMyApiService(retrofitFactory: RetrofitFactory): MyApiService {
-        val authInterceptor = Interceptor { chain ->
-            val request = chain.request().newBuilder()
-                .addHeader("Authorization", "Bearer TOKEN")
-                .build()
-            chain.proceed(request)
-        }
-        
-        return retrofitFactory.createService(
-            serviceClass = MyApiService::class.java,
-            baseUrl = "https://api.my-domain.com/",
-            interceptors = listOf(authInterceptor)
-        )
-    }
-}
-```
-
-### 4. Safe API Calls & Error Handling
-Use the `SafeApiCall` function to safely execute API calls. It is automatically provided by Hilt, checks network connectivity, and maps HTTP exceptions to domain `NetworkError`s.
+### Theme & Locale in Compose
 
 ```kotlin
-class MyRepositoryImpl @Inject constructor(
-    private val api: MyApiService,
-    private val safeApiCall: SafeApiCall
-) {
-
-    suspend fun fetchProfile(): Resource<Profile> {
-        return safeApiCall { api.getProfile() }
-    }
+@Composable
+fun App(themeController: ThemeController, localeController: LocaleController) {
+    val theme by themeController.currentTheme.collectAsState()
+    val darkTheme = theme == AppTheme.DARK
+    MyAppTheme(darkTheme = darkTheme) { /* content */ }
 }
 ```
-You can then seamlessly map the `Resource<T>` to your UI state, and use `NetworkErrorExt.asStringWrapper()` to easily display localized errors to the user.
 
-For a deeper dive into the architectural design and Kotlin features used, see [guide.md](guide.md).
+---
 
-## 🛠 Dependency Injection (Hilt)
-This library uses Hilt. Its internal implementations (like `FirebaseAuthService` or `FirestoreServiceImpl`) are bound to their respective interfaces (`AuthService`, `FirestoreService`) inside the library's internal DI modules.
-When you import this library, Hilt will automatically pick up these modules, so you can simply `@Inject` the interfaces directly into your consuming app's classes!
+## Error Handling
+
+All network calls return `Resource<T>`. Convert `NetworkError` to a UI-friendly string with:
+
+```kotlin
+val errorString = error.asStringWrapper().asString(context)
+```
+
+---
+
+## License
+
+```
+MIT License — see LICENSE file for details.
+```
