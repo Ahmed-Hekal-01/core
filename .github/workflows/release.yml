@@ -28,13 +28,20 @@ jobs:
     - name: Build with Gradle
       run: ./gradlew build
       
-    - name: Automatically Create/Update 'latest' Release
+    - name: Extract Version
+      id: extract_version
+      run: |
+        VERSION=$(grep -oP 'version\s*=\s*"\K[^"]+' core/build.gradle.kts | head -n 1)
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "Found version: $VERSION"
+        
+    - name: Automatically Create Release
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: latest
-        name: "Latest Main Build"
-        body: "This is an automatic release triggered by a push to the main branch."
+        tag_name: ${{ env.VERSION }}
+        name: "Release v${{ env.VERSION }}"
+        body: "Automated release of version ${{ env.VERSION }}."
         target_commitish: main
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
