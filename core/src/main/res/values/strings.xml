@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="no_internet_connection">No internet connection</string>
+    <string name="something_went_wrong">Something went wrong</string>
+    <string name="unauthorized_session">Session expired. Please log in again.</string>
+    <string name="forbidden_access">You do not have permission to access this.</string>
+    <string name="not_found">Resource not found.</string>
+</resources>
