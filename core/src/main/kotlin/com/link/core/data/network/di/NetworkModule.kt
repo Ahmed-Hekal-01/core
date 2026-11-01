@@ -74,4 +74,6 @@ internal object NetworkModule {
     @Provides
     @Singleton
     fun providesKtorHttpClient(json: Json): HttpClient = createBaseKtorClient(json)
+
+    // SessionExpiredSignal uses @Singleton @Inject constructor; no @Provides needed.
 }
