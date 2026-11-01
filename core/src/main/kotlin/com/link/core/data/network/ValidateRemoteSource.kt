@@ -14,6 +14,8 @@ internal class ValidateRemoteSourceImpl @Inject constructor() : ValidateRemoteSo
         return try {
             val result = apiCall()
             Resource.Success(result)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: retrofit2.HttpException) {
             when (e.code()) {
                 401 -> Resource.Error(NetworkError.Unauthorized)

@@ -1,16 +1,10 @@
 package com.link.core.di
 
 import android.net.ConnectivityManager
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.link.core.BuildConfig
 import com.link.core.data.datastore.AppPreferences
 import com.link.core.data.datastore.AppPreferencesImpl
-import com.link.core.data.firebase.auth.AuthService
-import com.link.core.data.firebase.auth.FirebaseAuthService
-import com.link.core.data.firebase.firestore.FirestoreService
-import com.link.core.data.firebase.firestore.FirestoreServiceImpl
 import com.link.core.data.network.CheckNetworkState
 import com.link.core.data.network.CheckNetworkStateImpl
 import com.link.core.data.network.KtorClientFactory
@@ -23,6 +17,7 @@ import com.link.core.data.network.ValidateRemoteSourceImpl
 import com.link.core.data.utils.Constants
 import com.link.core.domain.DefaultDispatcherProvider
 import com.link.core.domain.DispatcherProvider
+import com.link.core.domain.SessionExpiredSignal
 import com.link.core.domain.models.NetworkError
 import com.link.core.domain.models.Resource
 import com.link.core.presentation.session.SessionController
@@ -97,15 +92,6 @@ public val coreKoinModule: Module = module {
 
     // Ktor
     single<HttpClient> { createBaseKtorClient(get()) }
-    single { KtorClientFactory(get()) }
-}
-
-/**
- * Optional Firebase bindings. Add only if the app uses Firebase (needs google-services setup).
- */
-public val firebaseKoinModule: Module = module {
-    single<FirebaseAuth> { FirebaseAuth.getInstance() }
-    single<FirebaseFirestore> { FirebaseFirestore.getInstance() }
-    single<AuthService> { FirebaseAuthService(get()) }
-    single<FirestoreService> { FirestoreServiceImpl(get()) }
+    single { SessionExpiredSignal() }
+    single { KtorClientFactory(get(), get()) }
 }

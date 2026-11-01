@@ -9,9 +9,9 @@ public fun NetworkError.asStringWrapper(): StringWrapper {
         NetworkError.NoInternet -> StringWrapper.FromResource(R.string.no_internet_connection)
         NetworkError.Unauthorized -> StringWrapper.FromResource(R.string.unauthorized_session)
         NetworkError.Forbidden -> StringWrapper.FromResource(R.string.forbidden_access)
-        is NetworkError.NotFound -> message?.let { StringWrapper.FromString(it) }
+        is NetworkError.NotFound -> message?.takeIf { it.isNotBlank() }?.let { StringWrapper.FromString(it) }
             ?: StringWrapper.FromResource(R.string.not_found)
-        is NetworkError.ServerError -> message?.let { StringWrapper.FromString(it) }
+        is NetworkError.ServerError -> message?.takeIf { it.isNotBlank() }?.let { StringWrapper.FromString(it) }
             ?: StringWrapper.FromResource(R.string.something_went_wrong)
         NetworkError.Unknown -> StringWrapper.FromResource(R.string.something_went_wrong)
     }

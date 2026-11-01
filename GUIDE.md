@@ -1,6 +1,6 @@
 # Complete Developer Guide — `core` Library
 
-> Version **1.1.3** · Min SDK 24 · Kotlin 2.3.10 · Hilt 2.59.2 · Koin 4.1.0 · Ktor 3.4.1
+> Version **1.3.0** · Min SDK 24 · Kotlin 2.3.10 · Hilt 2.59.2 · Koin 4.1.0 · Ktor 3.4.1
 
 This guide is the single authoritative reference for every public API, pattern, and integration point shipped by the `core` library. It is intended to be read end-to-end when onboarding, and used as a lookup reference during development.
 
@@ -73,7 +73,7 @@ dependencyResolutionManagement {
 
 ```kotlin
 dependencies {
-    implementation("com.github.Ahmed-Hekal-01:core:1.1.3")
+    implementation("com.github.Ahmed-Hekal-01:core:1.3.0")
 }
 ```
 
@@ -115,7 +115,16 @@ class MainActivity : ComponentActivity() { ... }
 
 ### Step 6 — Firebase setup (optional — only if using Auth / Firestore)
 
-Skip this step entirely if your app does not use Firebase. With Hilt, the Firebase modules are not auto-installed; with Koin, just don't load `firebaseKoinModule`. Do not inject `AuthService` / `FirestoreService` in that case.
+Firebase is **not** bundled with `core` (since 1.2.0). Skip this step entirely if your app does not use Firebase — it adds nothing to your APK.
+
+If you do use it, add the Firebase dependencies to your app yourself:
+
+```kotlin
+implementation(platform("com.google.firebase:firebase-bom:33.12.0"))
+implementation("com.google.firebase:firebase-auth")
+implementation("com.google.firebase:firebase-firestore")
+```
+ With Hilt, the Firebase modules are not auto-installed; with Koin, just don't load `firebaseKoinModule`. Do not inject `AuthService` / `FirestoreService` in that case.
 
 With Hilt, install the Firebase modules in your app:
 
@@ -982,7 +991,7 @@ class App : Application() {
 
 | Module | Provides |
 |---|---|
-| `coreKoinModule` | `DispatcherProvider`, `AppPreferences`, `SessionController`, `ThemeController`, `LocaleController`, `Json`, `ConnectivityManager`, `CheckNetworkState`, `ValidateRemoteSource`, `SafeApiCall`, `HttpLoggingInterceptor`, `OkHttpClient`, `Retrofit.Builder`, `RetrofitFactory`, Ktor `HttpClient`, `KtorClientFactory` |
+| `coreKoinModule` | `DispatcherProvider`, `AppPreferences`, `SessionController`, `ThemeController`, `LocaleController`, `Json`, `ConnectivityManager`, `CheckNetworkState`, `ValidateRemoteSource`, `SafeApiCall`, `HttpLoggingInterceptor`, `OkHttpClient`, `Retrofit.Builder`, `RetrofitFactory`, Ktor `HttpClient`, `SessionExpiredSignal`, `KtorClientFactory` |
 | `firebaseKoinModule` (optional) | `FirebaseAuth`, `FirebaseFirestore`, `AuthService`, `FirestoreService` |
 
 > `AppPreferences` is `internal`; consumers use the controllers.
@@ -998,7 +1007,8 @@ Ktor is supported alongside Retrofit. `KtorClientFactory` follows the same patte
 | Component | Description |
 |---|---|
 | Base `HttpClient` | OkHttp engine, `ContentNegotiation` (kotlinx JSON), timeouts (`Constants.OkHTTPConstants`), `Logging` (`BODY` in debug, `NONE` in release), `expectSuccess = true` |
-| `KtorClientFactory` | `createClient(baseUrl, headers, configure)` → per-API `HttpClient` |
+| `KtorClientFactory` | `createClient(baseUrl, headers, notifyOnUnauthorized, configure)` → per-API `HttpClient` |
+| `SessionExpiredSignal` | Singleton (Hilt and Koin) with `events: SharedFlow<Unit>`; fires on 401 from opted-in clients |
 | `SafeApiCall` | Same wrapper as Retrofit; maps Ktor `ResponseException` to `NetworkError` |
 
 ### 18.2 `createClient`
@@ -1007,6 +1017,7 @@ Ktor is supported alongside Retrofit. `KtorClientFactory` follows the same patte
 public fun createClient(
     baseUrl: String,
     headers: Map<String, String> = emptyMap(),
+    notifyOnUnauthorized: Boolean = false,
     configure: HttpClientConfig<*>.() -> Unit = {}
 ): HttpClient
 ```
@@ -1015,7 +1026,33 @@ public fun createClient(
 |---|---|
 | `baseUrl` | Base URL applied to relative requests |
 | `headers` | Static headers (e.g. API key) for this client only |
+| `notifyOnUnauthorized` | If `true`, an HTTP 401 also calls `SessionExpiredSignal.notifyExpired()`. Default `false` |
 | `configure` | Extra per-API config (e.g. `Auth` plugin; requires adding `ktor-client-auth` to your app) |
+
+### 18.2.1 Session-expired signal (opt-in)
+
+```kotlin
+public class SessionExpiredSignal {
+    public val events: SharedFlow<Unit>
+    public fun notifyExpired()
+}
+```
+
+With `notifyOnUnauthorized = true`, a 401 `ClientRequestException` emits once on `events`. The exception still propagates, so `SafeApiCall` still returns `Resource.Error(NetworkError.Unauthorized)`. Emission never suspends (buffer 1, `DROP_OLDEST`); with no collector the event is dropped.
+
+**Leave it `false` for login clients**: a 401 there means wrong credentials, not an expired session.
+
+Collect at app level to log out:
+
+```kotlin
+// Koin: val signal: SessionExpiredSignal by inject()  |  Hilt: @Inject lateinit var signal
+appScope.launch {
+    signal.events.collect { /* clear tokens, navigate to login */ }
+}
+
+val api = factory.createClient("https://api.example.com/", notifyOnUnauthorized = true)
+val login = factory.createClient("https://auth.example.com/") // default false
+```
 
 ### 18.3 Usage with Koin
 

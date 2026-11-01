@@ -23,6 +23,13 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            isReturnDefaultValues = true
+        }
+    }
+
     buildFeatures {
         buildConfig = true
     }
@@ -43,7 +50,7 @@ publishing {
         register<MavenPublication>("release") {
             groupId = "com.link"
             artifactId = "core"
-            version = "1.1.3"
+            version = "1.3.0"
 
             afterEvaluate {
                 from(components["release"])
@@ -79,10 +86,11 @@ dependencies {
     api(libs.okhttp.logging)
     api(libs.kotlinx.serialization.json)
 
-    // Firebase
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.auth)
-    implementation(libs.firebase.firestore)
+    // Firebase (optional): compileOnly so apps that don't use Firebase don't pull it in.
+    // Apps using AuthService/FirestoreService must add firebase-auth / firebase-firestore themselves.
+    compileOnly(platform(libs.firebase.bom))
+    compileOnly(libs.firebase.auth)
+    compileOnly(libs.firebase.firestore)
 
     // DataStore
     implementation(libs.datastore.preferences)
@@ -96,4 +104,13 @@ dependencies {
 
     // Lifecycle
     implementation(libs.lifecycle.viewmodel)
+
+    // Unit tests
+    testImplementation(libs.junit)
+    testImplementation(libs.ktor.client.mock)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.turbine)
+    testImplementation(libs.mockk)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
 }
