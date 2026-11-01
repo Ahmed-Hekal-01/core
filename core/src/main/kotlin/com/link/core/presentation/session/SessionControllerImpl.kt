@@ -5,6 +5,7 @@ import com.link.core.domain.DispatcherProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -30,6 +31,9 @@ internal class SessionControllerImpl @Inject constructor(
             started = SharingStarted.Eagerly,
             initialValue = false
         )
+
+    override suspend fun getIsFirstLaunch(): Boolean = appPreferences.isFirstLaunch.first()
+    override suspend fun getIsGuest(): Boolean = appPreferences.isGuest.first()
 
     override suspend fun setFirstLaunchDone() {
         appPreferences.setFirstLaunchDone()

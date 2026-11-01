@@ -14,25 +14,23 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 @Module
-@InstallIn(SingletonComponent::class)
-internal object FirebaseProvidesModule {
+public object FirebaseProvidesModule {
     @Provides
     @Singleton
-    fun provideFirebaseAuth(): FirebaseAuth = FirebaseAuth.getInstance()
+    public fun provideFirebaseAuth(): FirebaseAuth = FirebaseAuth.getInstance()
 
     @Provides
     @Singleton
-    fun provideFirestore(): FirebaseFirestore = FirebaseFirestore.getInstance()
+    public fun provideFirestore(): FirebaseFirestore = FirebaseFirestore.getInstance()
 }
 
 @Module
-@InstallIn(SingletonComponent::class)
-internal abstract class FirebaseBindsModule {
+public abstract class FirebaseBindsModule {
     @Binds
     @Singleton
-    abstract fun bindAuthService(impl: FirebaseAuthService): AuthService
+    public abstract fun bindAuthService(impl: FirebaseAuthService): AuthService
 
     @Binds
     @Singleton
-    abstract fun bindFirestoreService(impl: FirestoreServiceImpl): FirestoreService
+    public abstract fun bindFirestoreService(impl: FirestoreServiceImpl): FirestoreService
 }

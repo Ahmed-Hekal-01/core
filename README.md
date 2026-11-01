@@ -40,7 +40,7 @@ In your module's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.Ahmed-Hekal-01:core:1.1.1")
+    implementation("com.github.Ahmed-Hekal-01:core:1.1.3")
 }
 ```
 

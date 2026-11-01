@@ -5,6 +5,10 @@ plugins {
     id("maven-publish")
 }
 
+ksp {
+    arg("dagger.hilt.disableModulesHaveInstallInCheck", "true")
+}
+
 android {
     namespace = "com.link.core"
     compileSdk {
@@ -17,6 +21,10 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     publishing {
@@ -35,12 +43,12 @@ publishing {
         register<MavenPublication>("release") {
             groupId = "com.link"
             artifactId = "core"
-            version = "1.1.1" // Bumped to 1.1.1 to force JitPack to generate a new POM
+            version = "1.1.3"
 
             afterEvaluate {
                 from(components["release"])
             }
-            
+
             // Force Gradle to declare this as an Android library in the POM file!
             pom {
                 packaging = "aar"
@@ -53,6 +61,16 @@ dependencies {
     // Hilt
     api(libs.hilt.android)
     ksp(libs.hilt.compiler)
+
+    // Koin
+    api(libs.koin.android)
+
+    // Ktor client
+    api(libs.ktor.client.core)
+    api(libs.ktor.client.okhttp)
+    api(libs.ktor.client.content.negotiation)
+    api(libs.ktor.serialization.json)
+    api(libs.ktor.client.logging)
 
     // Retrofit + OkHttp + kotlinx.serialization
     api(libs.retrofit)

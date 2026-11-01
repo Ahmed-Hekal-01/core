@@ -14,6 +14,9 @@ import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFact
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 import android.util.Log
+import io.ktor.client.HttpClient
+import com.link.core.data.network.createBaseKtorClient
+import com.link.core.BuildConfig
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -25,8 +28,11 @@ internal object NetworkModule {
         return HttpLoggingInterceptor { message ->
             Log.d("OkHttp", message)
         }.apply {
-            // Hardcoded to BODY for now, can be restricted to DEBUG builds later
-            level = HttpLoggingInterceptor.Level.BODY
+            level = if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.BODY
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
         }
     }
 
@@ -64,4 +70,8 @@ internal object NetworkModule {
             .client(okHttpClient)
             .addConverterFactory(json.asConverterFactory(contentType))
     }
+
+    @Provides
+    @Singleton
+    fun providesKtorHttpClient(json: Json): HttpClient = createBaseKtorClient(json)
 }

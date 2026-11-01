@@ -11,7 +11,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-internal class FirestoreServiceImpl @Inject constructor(
+public class FirestoreServiceImpl @Inject constructor(
     private val firestore: FirebaseFirestore
 ) : FirestoreService {
 

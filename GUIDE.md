@@ -1,6 +1,6 @@
 # Complete Developer Guide — `core` Library
 
-> Version **1.1.1** · Min SDK 24 · Kotlin 2.3.10 · Hilt 2.59.2
+> Version **1.1.3** · Min SDK 24 · Kotlin 2.3.10 · Hilt 2.59.2 · Koin 4.1.0 · Ktor 3.4.1
 
 This guide is the single authoritative reference for every public API, pattern, and integration point shipped by the `core` library. It is intended to be read end-to-end when onboarding, and used as a lookup reference during development.
 
@@ -24,6 +24,8 @@ This guide is the single authoritative reference for every public API, pattern, 
 14. [Hilt Dependency Graph](#14-hilt-dependency-graph)
 15. [Constants Reference](#15-constants-reference)
 16. [Full Package Map](#16-full-package-map)
+17. [Koin Setup (alternative to Hilt)](#17-koin-setup-alternative-to-hilt)
+18. [Networking (Ktor)](#18-networking-ktor)
 
 ---
 
@@ -71,11 +73,13 @@ dependencyResolutionManagement {
 
 ```kotlin
 dependencies {
-    implementation("com.github.Ahmed-Hekal-01:core:1.1.1")
+    implementation("com.github.Ahmed-Hekal-01:core:1.1.3")
 }
 ```
 
 ### Step 3 — Apply Hilt + KSP plugins
+
+> **Using Koin instead of Hilt?** Skip Steps 3–5 and go to [Section 17](#17-koin-setup-alternative-to-hilt).
 
 Root `build.gradle.kts`:
 
@@ -109,7 +113,17 @@ class MyApplication : Application()
 class MainActivity : ComponentActivity() { ... }
 ```
 
-### Step 6 — Firebase setup (if using Auth / Firestore)
+### Step 6 — Firebase setup (optional — only if using Auth / Firestore)
+
+Skip this step entirely if your app does not use Firebase. With Hilt, the Firebase modules are not auto-installed; with Koin, just don't load `firebaseKoinModule`. Do not inject `AuthService` / `FirestoreService` in that case.
+
+With Hilt, install the Firebase modules in your app:
+
+```kotlin
+@Module(includes = [FirebaseProvidesModule::class, FirebaseBindsModule::class])
+@InstallIn(SingletonComponent::class)
+object CoreFirebaseModule
+```
 
 Add `google-services.json` to your `app/` directory and apply the Google Services plugin:
 
@@ -265,7 +279,7 @@ fun ProductScreen(viewModel: ProductViewModel = hiltViewModel()) {
 The library auto-configures and exposes (via Hilt) a shared `OkHttpClient` and `Retrofit.Builder` with:
 
 - `kotlinx.serialization` JSON converter (`ignoreUnknownKeys = true`, `isLenient = true`, `encodeDefaults = true`)
-- HTTP body logging interceptor (logs to `OkHttp` Logcat tag)
+- HTTP body logging interceptor (logs to `OkHttp` Logcat tag in DEBUG builds, disabled in release builds)
 - 30 s connect / read / write timeouts
 
 ### 4.2 RetrofitFactory
@@ -676,6 +690,8 @@ viewModelScope.launch {
 interface SessionController {
     val isFirstLaunch: StateFlow<Boolean>
     val isGuest: StateFlow<Boolean>
+    suspend fun getIsFirstLaunch(): Boolean
+    suspend fun getIsGuest(): Boolean
     suspend fun setFirstLaunchDone()
     suspend fun setGuest(isGuest: Boolean)
 }
@@ -824,7 +840,8 @@ SingletonComponent
 │   ├── HttpLoggingInterceptor
 │   ├── Json (kotlinx.serialization)
 │   ├── OkHttpClient
-│   └── Retrofit.Builder
+│   ├── Retrofit.Builder
+│   └── HttpClient (Ktor base client)
 │
 ├── CoreDataModule
 │   ├── ConnectivityManager
@@ -832,7 +849,7 @@ SingletonComponent
 │   ├── CheckNetworkState (→ CheckNetworkStateImpl)
 │   └── ValidateRemoteSource (→ ValidateRemoteSourceImpl)
 │
-├── FirebaseModule
+├── FirebaseModule  (NOT auto-installed — see Step 6)
 │   ├── FirebaseAuth
 │   ├── FirebaseFirestore
 │   ├── AuthService (→ FirebaseAuthService)
@@ -852,7 +869,7 @@ SingletonComponent
     └── DispatcherProvider (→ DefaultDispatcherProvider)
 ```
 
-> **Note**: `RetrofitFactory` is a regular `@Inject`-annotated class and does not appear in a `@Module` — Hilt creates it automatically wherever injected.
+> **Note**: `RetrofitFactory` and `KtorClientFactory` are regular `@Inject`-annotated class and does not appear in a `@Module` — Hilt creates it automatically wherever injected.
 
 ---
 
@@ -885,10 +902,10 @@ com.link.core
 │   ├── firebase
 │   │   ├── auth
 │   │   │   ├── AuthService         (public interface)
-│   │   │   └── FirebaseAuthService (internal @Singleton impl)
+│   │   │   └── FirebaseAuthService (public @Singleton impl)
 │   │   ├── firestore
 │   │   │   ├── FirestoreService    (public interface + reified extensions)
-│   │   │   └── FirestoreServiceImpl (internal @Singleton impl)
+│   │   │   └── FirestoreServiceImpl (public @Singleton impl)
 │   │   └── di/FirebaseModule
 │   ├── network
 │   │   ├── CheckNetworkState       (internal fun interface)
@@ -930,6 +947,143 @@ com.link.core
         ├── NetworkErrorExt         (NetworkError.asStringWrapper())
         └── StringWrapperExt        (StringWrapper.asString(context))
 ```
+
+---
+
+## 17. Koin Setup (alternative to Hilt)
+
+Use **either** Hilt or Koin in an app, not both. `coreKoinModule` exposes the same services as the Hilt modules.
+
+### 17.1 Manifest
+
+```xml
+<uses-permission android:name="android.permission.INTERNET"/>
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+```
+
+### 17.2 Start Koin
+
+```kotlin
+class App : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        startKoin {
+            androidContext(this@App)
+            modules(coreKoinModule, appModule)
+            // modules(firebaseKoinModule)  // only if the app uses Firebase
+        }
+    }
+}
+```
+
+`androidContext(...)` is required (DataStore and `ConnectivityManager` need it).
+
+### 17.3 What is registered
+
+| Module | Provides |
+|---|---|
+| `coreKoinModule` | `DispatcherProvider`, `AppPreferences`, `SessionController`, `ThemeController`, `LocaleController`, `Json`, `ConnectivityManager`, `CheckNetworkState`, `ValidateRemoteSource`, `SafeApiCall`, `HttpLoggingInterceptor`, `OkHttpClient`, `Retrofit.Builder`, `RetrofitFactory`, Ktor `HttpClient`, `KtorClientFactory` |
+| `firebaseKoinModule` (optional) | `FirebaseAuth`, `FirebaseFirestore`, `AuthService`, `FirestoreService` |
+
+> `AppPreferences` is `internal`; consumers use the controllers.
+
+---
+
+## 18. Networking (Ktor)
+
+Ktor is supported alongside Retrofit. `KtorClientFactory` follows the same pattern as `RetrofitFactory`: it holds a shared base `HttpClient` and clones it per API, so headers/plugins never leak between APIs.
+
+### 18.1 What the library provides
+
+| Component | Description |
+|---|---|
+| Base `HttpClient` | OkHttp engine, `ContentNegotiation` (kotlinx JSON), timeouts (`Constants.OkHTTPConstants`), `Logging` (`BODY` in debug, `NONE` in release), `expectSuccess = true` |
+| `KtorClientFactory` | `createClient(baseUrl, headers, configure)` → per-API `HttpClient` |
+| `SafeApiCall` | Same wrapper as Retrofit; maps Ktor `ResponseException` to `NetworkError` |
+
+### 18.2 `createClient`
+
+```kotlin
+public fun createClient(
+    baseUrl: String,
+    headers: Map<String, String> = emptyMap(),
+    configure: HttpClientConfig<*>.() -> Unit = {}
+): HttpClient
+```
+
+| Parameter | Description |
+|---|---|
+| `baseUrl` | Base URL applied to relative requests |
+| `headers` | Static headers (e.g. API key) for this client only |
+| `configure` | Extra per-API config (e.g. `Auth` plugin; requires adding `ktor-client-auth` to your app) |
+
+### 18.3 Usage with Koin
+
+```kotlin
+val appModule = module {
+    single(named("movies")) {
+        get<KtorClientFactory>().createClient(
+            baseUrl = "https://api.example.com/",
+            headers = mapOf("X-Api-Key" to BuildConfig.API_KEY),
+        )
+    }
+    single<MovieApi> { MovieApiImpl(get(named("movies"))) }
+    single<MovieRepository> { MovieRepositoryImpl(get(), get()) } // MovieApi, SafeApiCall
+    viewModelOf(::MoviesViewModel)
+}
+```
+
+### 18.4 Usage with Hilt
+
+```kotlin
+@Singleton
+class MovieRepositoryImpl @Inject constructor(
+    ktorClientFactory: KtorClientFactory,
+    private val safeApiCall: SafeApiCall,
+) : MovieRepository {
+    private val client = ktorClientFactory.createClient("https://api.example.com/")
+
+    override suspend fun movies(): Resource<List<Movie>> =
+        safeApiCall { client.get("movies").body() }
+}
+```
+
+### 18.5 API class and ViewModel
+
+```kotlin
+@Serializable
+data class Movie(val id: Int, val title: String)
+
+class MovieApiImpl(private val client: HttpClient) : MovieApi {
+    override suspend fun getMovies(): List<Movie> = client.get("movies").body()
+    override suspend fun create(m: Movie): Movie = client.post("movies") { setBody(m) }.body()
+}
+
+class MoviesViewModel(private val repo: MovieRepository) : ViewModel() {
+    fun load() = viewModelScope.launch {
+        when (val res = repo.movies()) {
+            is Resource.Success -> { /* res.data */ }
+            is Resource.Error -> { /* res.error */ }
+        }
+    }
+}
+```
+
+Imports: `io.ktor.client.request.*`, `io.ktor.client.call.body`.
+
+### 18.6 Error mapping
+
+`expectSuccess = true` makes non-2xx responses throw `ResponseException`, which `SafeApiCall` maps:
+
+| Status | `NetworkError` |
+|---|---|
+| 401 | `Unauthorized` |
+| 403 | `Forbidden` |
+| 404 | `NotFound(message)` |
+| other | `ServerError(code, message)` |
+| offline | `NoInternet` |
+| other exception | `Unknown` |
+
 
 ---
 
