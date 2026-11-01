@@ -28,13 +28,11 @@ internal class AppPreferencesImpl @Inject constructor(
     }
 
     override val theme: Flow<AppTheme> = dataStore.data.map { prefs ->
-        val themeString = prefs[Keys.THEME] ?: AppTheme.LIGHT.name
-        AppTheme.valueOf(themeString)
+        AppTheme.entries.firstOrNull { it.name == prefs[Keys.THEME] } ?: AppTheme.LIGHT
     }
 
     override val language: Flow<AppLanguage> = dataStore.data.map { prefs ->
-        val langString = prefs[Keys.LANGUAGE] ?: AppLanguage.EN.name
-        AppLanguage.valueOf(langString)
+        AppLanguage.entries.firstOrNull { it.name == prefs[Keys.LANGUAGE] } ?: AppLanguage.EN
     }
 
     override val isFirstLaunch: Flow<Boolean> = dataStore.data.map { prefs ->

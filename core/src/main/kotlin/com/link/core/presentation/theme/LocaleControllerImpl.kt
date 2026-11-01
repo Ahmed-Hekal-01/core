@@ -6,6 +6,7 @@ import com.link.core.domain.DispatcherProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,6 +20,7 @@ internal class LocaleControllerImpl @Inject constructor(
     private val scope = CoroutineScope(dispatcherProvider.io)
 
     override val currentLanguage: StateFlow<AppLanguage> = appPreferences.language
+        .catch { }
         .stateIn(
             scope = scope,
             started = SharingStarted.Eagerly,
